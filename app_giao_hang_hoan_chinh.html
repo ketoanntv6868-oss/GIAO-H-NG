@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Giao Hàng Kho</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f4f3f0;--card:#fff;--border:rgba(0,0,0,.08);
+  --text:#1a1a1a;--muted:#6b6b6b;--hint:#aaa;
+  --blue:#185FA5;--blight:#E6F1FB;--bdark:#0C447C;
+  --green:#3B6D11;--glight:#EAF3DE;--gdark:#27500A;
+  --amber:#854F0B;--alight:#FAEEDA;--adark:#633806;
+  --red:#A32D2D;--rlight:#FCEBEB;--rdark:#791F1F;
+  --gray:#5F5E5A;--graylight:#F1EFE8;
+  --r:12px;--rs:8px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+
+/* ── ROLE SCREEN ── */
+.role-screen{display:none;position:fixed;inset:0;background:linear-gradient(145deg,#0C447C 0%,#185FA5 60%,#1a6fc4 100%);z-index:500;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px}
+.role-screen.show{display:flex}
+.role-logo{font-size:52px;margin-bottom:10px}
+.role-title{font-size:24px;font-weight:800;color:#fff;margin-bottom:4px;letter-spacing:-.3px}
+.role-sub{font-size:13px;color:rgba(255,255,255,.65);margin-bottom:36px}
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:380px}
+.role-btn{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:14px;padding:20px 12px;text-align:center;cursor:pointer;color:#fff;transition:all .15s;backdrop-filter:blur(4px)}
+.role-btn:active,.role-btn:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.5);transform:scale(.98)}
+.role-btn.full{grid-column:1/-1}
+.role-icon{font-size:32px;margin-bottom:8px}
+.role-name{font-size:14px;font-weight:700}
+.role-desc{font-size:11px;opacity:.65;margin-top:3px;line-height:1.4}
+
+/* ── ROLE BADGE ── */
+.role-badge{position:fixed;top:10px;right:10px;background:var(--blue);border-radius:20px;padding:5px 12px;font-size:11px;color:#fff;cursor:pointer;z-index:100;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+
+/* ── APP ── */
+.app{max-width:1020px;margin:0 auto;padding:10px;padding-bottom:calc(72px + var(--safe-bottom))}
+
+/* ── TOP ── */
+.top{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.05);position:sticky;top:0;z-index:50}
+.top h1{font-size:14px;font-weight:700}.top-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.pills{display:flex;gap:4px}
+.pill{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700}
+.pb{background:var(--blight);color:var(--bdark)}.pa{background:var(--alight);color:var(--adark)}.pg{background:var(--glight);color:var(--gdark)}
+.sync-btn{background:none;border:none;font-size:18px;cursor:pointer;padding:4px;color:var(--muted)}
+.sync-btn.spinning{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── BOTTOM NAV ── */
+.bnav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);z-index:60;padding-bottom:var(--safe-bottom)}
+.bnav-inner{display:flex}
+.bnav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 2px;cursor:pointer;font-size:9px;color:var(--muted);gap:2px;border:none;background:none}
+.bnav-tab .bicon{font-size:21px;line-height:1}
+.bnav-tab.active{color:var(--blue);font-weight:700}
+
+/* ── STEPPER ── */
+.stepper{display:flex;background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:10px}
+.stab{flex:1;padding:9px 3px;text-align:center;cursor:pointer;font-size:10px;color:var(--muted);border-right:1px solid var(--border);line-height:1.4;user-select:none;transition:background .15s}
+.stab:last-child{border-right:none}
+.stab.active{background:var(--blue);color:#fff;font-weight:700}
+.stab.done{background:var(--glight);color:var(--green);font-weight:600}
+.snum{display:block;font-size:8px;opacity:.6;margin-bottom:1px}
+
+/* ── PANELS ── */
+.panel{display:none}.panel.active{display:block}
+
+/* ── KPI ── */
+.kgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.kcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 10px;position:relative;overflow:hidden}
+.kcard::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%}
+.kb::before{background:var(--blue)}.ka::before{background:#EF9F27}.kg::before{background:#97C459}.kr::before{background:#E24B4A}
+.klbl{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.knum{font-size:24px;font-weight:800;line-height:1}
+.kb .knum{color:var(--blue)}.ka .knum{color:var(--amber)}.kg .knum{color:var(--green)}.kr .knum{color:var(--red)}
+.ksub{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ── MONEY ── */
+.mrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.mcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px;display:flex;align-items:center;gap:10px}
+.micon{font-size:24px;flex-shrink:0}
+.mlbl{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.mval{font-size:16px;font-weight:800;margin-top:2px}
+.ma{color:var(--amber)}.mg{color:var(--green)}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--r);overflow:hidden;border:1px solid var(--border);margin-bottom:10px;font-size:12px}
+.tbl th{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;padding:8px 10px;text-align:left;background:var(--bg);border-bottom:1px solid var(--border)}
+.tbl td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+
+/* ── BADGES ── */
+.badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap;display:inline-block}
+.bw{background:var(--graylight);color:var(--gray)}.bd{background:var(--blight);color:var(--bdark)}
+.bok{background:var(--glight);color:var(--gdark)}.bf{background:var(--rlight);color:var(--rdark)}
+.bcod{background:#FFF3CD;color:#856404;font-size:10px;padding:2px 6px;border-radius:8px;font-weight:700}
+.bpaid{background:var(--blight);color:var(--bdark);font-size:10px;padding:2px 6px;border-radius:8px;font-weight:700}
+
+/* ── ORDER CARDS ── */
+.ocard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 13px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.ocard:active{opacity:.82}
+.ocard.sel{border:2px solid var(--blue);background:#f0f6ff}
+.ocard.bl-b{border-left:4px solid #378ADD}.ocard.bl-g{border-left:4px solid #97C459}.ocard.bl-r{border-left:4px solid #E24B4A}
+.ocard.nocur{cursor:default}
+.ohead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.oid{font-size:13px;font-weight:700}
+.oaddr{font-size:11px;color:var(--hint);margin-top:3px}
+.stag{font-size:10px;color:var(--hint);margin-top:2px}
+.oamt{font-size:13px;font-weight:800;margin-top:3px}
+.amt-g{color:var(--green)}.amt-gray{color:var(--gray)}
+
+/* ── DRIVER GRID ── */
+.drv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.drv-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:11px;position:relative;cursor:pointer;transition:border-color .15s}
+.drv-card.drv-busy{border-color:#EF9F27}.drv-card.drv-ok{border-color:#97C459}.drv-card.drv-sel{border-color:var(--blue);background:var(--blight)}
+.drv-avatar{width:36px;height:36px;border-radius:50%;background:var(--blight);color:var(--bdark);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}
+.drv-name{font-size:12px;font-weight:700;line-height:1.3}.drv-shift{font-size:10px;color:var(--muted);margin-top:1px}
+.drv-del{position:absolute;top:6px;right:8px;font-size:14px;opacity:.3;cursor:pointer;padding:2px}
+.drv-add{background:transparent;border:2px dashed var(--border);border-radius:var(--r);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;color:var(--muted);font-size:12px;font-weight:600;min-height:82px}
+
+/* ── PROGRESS ── */
+.pbar{height:4px;background:var(--bg);border-radius:2px;overflow:hidden;margin-top:4px}
+.pfill{height:100%;border-radius:2px;background:var(--green)}.pfill-a{background:#EF9F27}
+.opills{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.op{font-size:10px;padding:2px 6px;border-radius:8px;font-weight:700}
+.opd{background:var(--blight);color:var(--bdark)}.opok{background:var(--glight);color:var(--gdark)}.opf{background:var(--rlight);color:var(--rdark)}
+
+/* ── CASH WIDGET ── */
+.cwidget{background:var(--card);border:1.5px solid #EF9F27;border-radius:var(--r);padding:12px 14px;margin-bottom:12px}
+.cw-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.cw-title{font-size:12px;font-weight:700;color:var(--amber);display:flex;align-items:center;gap:6px}
+.cw-total{font-size:14px;font-weight:800}
+.cw-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:7px;margin-top:10px}
+.cw-item{background:var(--alight);border-radius:var(--rs);padding:9px 11px}
+.cw-sh{font-size:11px;font-weight:700;color:var(--adark)}
+.cw-amt{font-size:16px;font-weight:800;color:var(--amber);margin-top:2px}
+.cw-cnt{font-size:10px;color:var(--amber);margin-top:1px}
+.cw-zero{font-size:12px;color:var(--hint);text-align:center;padding:8px 0;grid-column:1/-1}
+
+/* ── FORMS ── */
+.row2{display:flex;gap:10px;margin-bottom:10px}.col{flex:1;min-width:0}
+label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600}
+select,input[type=text],input[type=number],input[type=tel]{width:100%;font-size:14px;padding:10px 11px;border:1px solid var(--border);border-radius:var(--rs);background:var(--card);color:var(--text);outline:none;-webkit-appearance:none}
+select:focus,input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.1)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 16px;border-radius:var(--rs);font-size:13px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--text);transition:all .12s;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-p{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-s{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-d{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-o{border:1.5px solid var(--blue);color:var(--blue);background:transparent}
+.btn-sm{padding:6px 11px;font-size:11px}
+.btn-full{width:100%;margin-bottom:9px;padding:14px;font-size:14px}
+
+/* ── PAYMENT ── */
+.pay-grid{display:flex;gap:10px;margin-bottom:12px}
+.pay-opt{flex:1;padding:16px 8px;border-radius:var(--r);border:2px solid var(--border);cursor:pointer;text-align:center;background:var(--card);transition:all .15s}
+.pay-opt:active{transform:scale(.97)}
+.sel-cash{border-color:var(--green)!important;background:var(--glight)!important}
+.sel-ck{border-color:var(--blue)!important;background:var(--blight)!important}
+.pay-icon{font-size:28px;margin-bottom:5px}.pay-label{font-size:14px;font-weight:700}.pay-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── IMAGE UPLOAD ── */
+.img-upload-area{border:2px dashed var(--border);border-radius:var(--r);padding:22px 16px;text-align:center;cursor:pointer;background:var(--bg);margin-bottom:10px;position:relative;transition:all .2s;overflow:hidden}
+.img-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.img-upload-area.has-img{border-color:var(--green);background:var(--glight)}
+.img-preview{width:100%;max-height:180px;object-fit:contain;border-radius:var(--rs);margin-top:10px;display:none;border:1px solid var(--border)}
+.img-preview.show{display:block}
+
+/* ── MISC ── */
+.ibox{background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);padding:11px 13px;margin-bottom:10px;font-size:12px;color:var(--muted);line-height:1.6}
+.ibox strong{color:var(--text)}
+.divider{height:1px;background:var(--border);margin:13px 0}
+.flex-end{display:flex;justify-content:flex-end;gap:8px}
+.flex-bet{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.mt8{margin-top:8px}
+.empty{text-align:center;padding:24px 0;color:var(--hint);font-size:13px}
+.alrt{padding:9px 12px;border-radius:var(--rs);font-size:12px;margin-bottom:10px;border:1px solid}
+.alrt-ok{background:var(--glight);color:var(--gdark);border-color:#C0DD97}
+.alrt-info{background:var(--blight);color:var(--bdark);border-color:#B5D4F4}
+.alrt-err{background:var(--rlight);color:var(--rdark);border-color:#F09595}
+.sec-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px}
+
+/* ── EXCEL ── */
+.xl-drop{border:2px dashed rgba(0,0,0,.12);border-radius:var(--r);padding:22px;text-align:center;cursor:pointer;background:var(--card);margin-bottom:12px;position:relative}
+.xl-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.xl-drop.drag,.xl-drop:hover{border-color:var(--blue);background:var(--blight)}
+.xl-icon{font-size:32px;margin-bottom:6px}.xl-title{font-size:13px;font-weight:700;margin-bottom:3px}.xl-sub{font-size:11px;color:var(--muted)}
+.prev-wrap{overflow-x:auto;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rs);margin-bottom:10px}
+.prev-tbl{width:100%;border-collapse:collapse;font-size:11px;min-width:560px}
+.prev-tbl th{position:sticky;top:0;background:var(--bg);font-weight:700;color:var(--muted);padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.prev-tbl td{padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.04)}
+
+/* ── HANDOVER ── */
+.hi{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--card);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:8px;gap:8px}
+.hi-name{font-size:13px;font-weight:700}.hi-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.hi-amt{font-size:15px;font-weight:800;color:var(--green);flex-shrink:0}.hi-ck{color:var(--blue)}
+
+/* ── SUMMARY ── */
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.scard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px;text-align:center}
+.snum2{font-size:22px;font-weight:800}.slbl{font-size:10px;color:var(--muted);margin-top:3px}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex}
+@media(min-width:600px){.modal-bg{align-items:center}}
+.modal{background:var(--card);border-radius:var(--r) var(--r) 0 0;padding:20px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto}
+@media(min-width:600px){.modal{border-radius:var(--r)}}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:14px}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px}
+
+/* ── LOADING ── */
+.loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:10px;font-size:13px;color:var(--muted)}
+.loading.show{display:flex}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+
+/* ── RESPONSIVE ── */
+@media(max-width:640px){
+  .stepper{display:none}.bnav{display:block}
+  .kgrid{grid-template-columns:repeat(2,1fr)}
+  .mrow{grid-template-columns:1fr}
+  .sgrid{grid-template-columns:repeat(2,1fr)}
+  .row2{flex-direction:column;gap:8px}
+  .drv-grid{grid-template-columns:repeat(2,1fr)}
+  .cw-body{grid-template-columns:1fr 1fr}
+  .pills{display:none}.hide-m{display:none}
+}
+@media(min-width:641px){.show-m{display:none}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading" id="loading"><div class="spinner"></div><span id="loading-msg">Đang tải...</span></div>
+
+<!-- ROLE SCREEN -->
+<div class="role-screen show" id="role-screen">
+  <div class="role-logo">📦</div>
+  <div class="role-title">Giao Hàng Kho</div>
+  <div class="role-sub">Chọn vai trò của bạn để tiếp tục</div>
+  <div class="role-grid">
+    <div class="role-btn full" onclick="setRole('kho')">
+      <div class="role-icon">🏭</div>
+      <div class="role-name">Nhân viên kho</div>
+      <div class="role-desc">Nhập đơn · Phân tài xế · Xem Dashboard</div>
+    </div>
+    <div class="role-btn" onclick="setRole('shipper')">
+      <div class="role-icon">🚚</div>
+      <div class="role-name">Tài xế</div>
+      <div class="role-desc">Xác nhận giao hàng</div>
+    </div>
+    <div class="role-btn" onclick="setRole('kt')">
+      <div class="role-icon">💼</div>
+      <div class="role-name">Kế toán</div>
+      <div class="role-desc">Thu tiền · Xác nhận CK</div>
+    </div>
+  </div>
+</div>
+
+<!-- ROLE BADGE (top right when logged in) -->
+<div class="role-badge" id="role-badge" style="display:none" onclick="qs('role-screen').classList.add('show')">
+  👤 <span id="role-name-badge"></span> ▾
+</div>
+
+<!-- MODAL: DRIVER -->
+<div class="modal-bg" id="drv-modal">
+  <div class="modal">
+    <div class="modal-handle show-m"></div>
+    <p class="modal-title" id="drv-modal-title">Thêm tài xế</p>
+    <div style="margin-bottom:10px"><label>Họ tên *</label><input type="text" id="di-name" placeholder="Nguyễn Văn A"></div>
+    <div style="margin-bottom:10px"><label>Số điện thoại</label><input type="tel" id="di-phone" placeholder="0901234567"></div>
+    <div style="margin-bottom:14px"><label>Ca mặc định</label>
+      <select id="di-shift"><option>Ca sáng (7h–12h)</option><option>Ca chiều (12h–18h)</option><option>Ca tối (18h–22h)</option></select>
+    </div>
+    <div class="flex-end"><button class="btn" onclick="closeModal('drv-modal')">Huỷ</button><button class="btn btn-p" onclick="saveDriver()">Lưu</button></div>
+  </div>
+</div>
+
+<!-- MODAL: CONFIRM DELIVERY -->
+<div class="modal-bg" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-handle show-m"></div>
+    <p class="modal-title" id="cm-title">Xác nhận đơn</p>
+    <div id="cm-body"></div>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until role selected) -->
+<div class="app" id="main-app" style="display:none">
+
+<!-- TOP -->
+<div class="top">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:20px">📦</span>
+    <div><h1>Giao Hàng Kho</h1><div class="top-sub" id="top-date"></div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <div class="pills">
+      <span class="pill pb" id="sp-pend">0 chờ</span>
+      <span class="pill pa" id="sp-del">0 giao</span>
+      <span class="pill pg" id="sp-done">0 xong</span>
+    </div>
+    <button class="sync-btn" id="sync-btn" onclick="syncAll()">🔄</button>
+  </div>
+</div>
+
+<!-- STEPPER (desktop) -->
+<div class="stepper" id="stepper"></div>
+
+<!-- PANEL 0: DASHBOARD -->
+<div class="panel" id="panel-0">
+  <div class="kgrid">
+    <div class="kcard kb"><div class="klbl">Tổng đơn</div><div class="knum" id="k-tot">0</div><div class="ksub" id="k-tot-s">0 khu vực</div></div>
+    <div class="kcard ka"><div class="klbl">Đang giao</div><div class="knum" id="k-del">0</div><div class="ksub" id="k-del-s">0 tài xế</div></div>
+    <div class="kcard kg"><div class="klbl">Hoàn thành</div><div class="knum" id="k-ok">0</div><div class="ksub" id="k-ok-s">0%</div></div>
+    <div class="kcard kr"><div class="klbl">Thất bại</div><div class="knum" id="k-fail">0</div><div class="ksub" id="k-fail-s">0%</div></div>
+  </div>
+  <div class="mrow">
+    <div class="mcard"><div class="micon">💵</div><div><div class="mlbl">Tiền mặt lưu hành</div><div class="mval ma" id="d-hold">0 ₫</div><div style="font-size:10px;color:var(--muted);margin-top:2px" id="d-hold-s"></div></div></div>
+    <div class="mcard"><div class="micon">✅</div><div><div class="mlbl">Đã thu & xác nhận</div><div class="mval mg" id="d-conf">0 ₫</div><div style="font-size:10px;color:var(--muted);margin-top:2px" id="d-ck-s"></div></div></div>
+  </div>
+  <p class="sec-title">Trạng thái tài xế</p><div id="d-driver"></div>
+  <div class="divider"></div>
+  <p class="sec-title">Theo khu vực</p><div id="d-zone"></div>
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-sm" onclick="exportExcel()">📊 Xuất Excel</button>
+    <button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="confirmResetDay()">🔄 Reset ngày mới</button>
+  </div>
+</div>
+
+<!-- PANEL 1: NHẬP ĐƠN -->
+<div class="panel" id="panel-1">
+  <div class="flex-bet" style="margin-bottom:12px">
+    <p class="sec-title" style="margin:0">Nhập đơn hàng</p>
+    <button class="btn btn-o btn-sm" onclick="downloadTemplate()">⬇ File mẫu</button>
+  </div>
+  <div class="xl-drop" id="xl-drop" ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+    <input type="file" id="xl-file" accept=".xlsx,.xls,.csv" onchange="onFileChange(event)">
+    <div class="xl-icon">📊</div>
+    <div class="xl-title">Upload file Excel / CSV</div>
+    <div class="xl-sub">Kéo thả hoặc nhấn chọn file</div>
+  </div>
+  <div id="preview-section" style="display:none">
+    <div class="flex-bet" style="margin-bottom:8px">
+      <p style="font-size:12px;font-weight:700">Preview: <span id="preview-count">0</span> đơn</p>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-sm" onclick="clearImport()">✕ Huỷ</button>
+        <button class="btn btn-p btn-sm" onclick="importOrders()">✓ Nhập <span id="btn-count">0</span> đơn</button>
+      </div>
+    </div>
+    <div class="prev-wrap"><table class="prev-tbl" id="preview-tbl"></table></div>
+  </div>
+  <div class="divider"></div>
+  <p style="font-size:13px;font-weight:700;margin-bottom:10px">Thêm đơn thủ công</p>
+  <div class="row2">
+    <div class="col"><label>Mã đơn / Số HĐ</label><input type="text" id="m-id" placeholder="VD: 2604250033"></div>
+    <div class="col"><label>Tên người nhận *</label><input type="text" id="m-name" placeholder="Nguyễn Văn A"></div>
+  </div>
+  <div class="row2">
+    <div class="col"><label>Số điện thoại</label><input type="tel" id="m-phone" placeholder="0901234567"></div>
+    <div class="col"><label>Khu vực</label>
+      <select id="m-zone"><option value="">Chọn khu vực</option><option>Thủ Đức</option><option>Bình Chánh</option><option>Quận 9</option><option>Quận 12</option><option>Hóc Môn</option><option>Long An</option><option>Khác</option></select>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="col" style="flex:2"><label>Địa chỉ giao hàng</label><input type="text" id="m-addr" placeholder="Số nhà, đường, phường..."></div>
+    <div class="col"><label>Số tiền (₫)</label><input type="number" id="m-amt" placeholder="0"></div>
+    <div class="col"><label>Loại</label>
+      <select id="m-status"><option value="cod">Cần thu COD</option><option value="paid">Đã thanh toán</option></select>
+    </div>
+  </div>
+  <div class="flex-end"><button class="btn btn-p" onclick="addManual()">+ Thêm đơn</button></div>
+  <div class="divider"></div>
+  <div class="flex-bet" style="margin-bottom:9px">
+    <p class="sec-title" style="margin:0">Đã nhập (<span id="p1-count">0</span>)</p>
+    <input type="text" id="p1-search" placeholder="Tìm..." style="width:140px;font-size:12px;padding:7px 9px" oninput="renderLists()">
+  </div>
+  <div id="list-1"></div>
+  <div class="empty" id="empty-1">Chưa có đơn. Upload Excel hoặc thêm thủ công.</div>
+</div>
+
+<!-- PANEL 2: PHÂN TÀI XẾ -->
+<div class="panel" id="panel-2">
+  <div class="flex-bet" style="margin-bottom:9px">
+    <p class="sec-title" style="margin:0">Tài xế hiện có</p>
+    <button class="btn btn-p btn-sm" onclick="openDriverModal()">+ Thêm tài xế</button>
+  </div>
+  <div class="drv-grid" id="drv-grid"></div>
+  <div class="divider"></div>
+  <div class="flex-bet" style="margin-bottom:9px">
+    <p class="sec-title" style="margin:0" id="p2-sec-title">Đơn chờ phân công</p>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <input type="text" id="p2-search" placeholder="Tìm..." style="width:110px;font-size:12px;padding:7px 9px" oninput="renderLists()">
+      <select id="p2-zone" onchange="renderLists()" style="font-size:12px;padding:7px 9px"><option value="">Tất cả KV</option><option>Thủ Đức</option><option>Bình Chánh</option><option>Quận 9</option><option>Quận 12</option><option>Hóc Môn</option><option>Long An</option></select>
+      <button class="btn btn-sm hide-m" onclick="selectAllPending()">Chọn tất cả</button>
+      <button class="btn btn-sm" onclick="clearSel()">Bỏ chọn</button>
+    </div>
+  </div>
+  <div id="list-2"></div>
+  <div class="empty" id="empty-2">Không có đơn chờ phân công.</div>
+  <div id="assign-form" style="display:none">
+    <div class="divider"></div>
+    <p style="font-size:13px;font-weight:700;margin-bottom:10px">Phân <span id="sel-count">0</span> đơn cho tài xế</p>
+    <div class="row2">
+      <div class="col"><label>Tài xế *</label><select id="shipper-sel"><option value="">-- Chọn tài xế --</option></select></div>
+      <div class="col"><label>Ca giao</label><select id="shift-sel"><option>Ca sáng (7h–12h)</option><option>Ca chiều (12h–18h)</option><option>Ca tối (18h–22h)</option></select></div>
+    </div>
+    <div class="flex-end mt8"><button class="btn" onclick="clearSel()">Huỷ</button><button class="btn btn-p" onclick="confirmAssign()">✓ Xác nhận phân công</button></div>
+  </div>
+</div>
+
+<!-- PANEL 3: GIAO HÀNG -->
+<div class="panel" id="panel-3">
+  <div class="cwidget">
+    <div class="cw-head" onclick="toggleCW(3)">
+      <div class="cw-title">💵 Tiền mặt đang lưu hành <span class="cw-total" id="cw-3-total"></span></div>
+      <span id="cw-3-tog">▾</span>
+    </div>
+    <div id="cw-3-body" class="cw-body"></div>
+  </div>
+  <p class="sec-title">Nhấn vào đơn để xác nhận kết quả</p>
+  <div id="list-3"></div>
+  <div class="empty" id="empty-3">Không có đơn đang giao.</div>
+</div>
+
+<!-- PANEL 4: BÀN GIAO KT -->
+<div class="panel" id="panel-4">
+  <div class="cwidget">
+    <div class="cw-head" onclick="toggleCW(4)">
+      <div class="cw-title">💵 Tiền mặt đang lưu hành <span class="cw-total" id="cw-4-total"></span></div>
+      <span id="cw-4-tog">▾</span>
+    </div>
+    <div id="cw-4-body" class="cw-body"></div>
+  </div>
+  <p class="sec-title">💵 Tiền mặt — thu từ tài xế</p>
+  <div id="kt-cash"></div>
+  <div class="empty" id="kt-cash-e" style="display:none;padding:8px 0">Không có tiền mặt cần bàn giao.</div>
+  <div class="divider"></div>
+  <p class="sec-title">🏦 Chuyển khoản — xác nhận đã nhận</p>
+  <div id="kt-ck"></div>
+  <div class="empty" id="kt-ck-e" style="display:none;padding:8px 0">Không có CK cần xác nhận.</div>
+  <div class="empty" id="kt-all-e" style="display:none">Chưa có đơn hoàn thành để bàn giao.</div>
+</div>
+
+<!-- PANEL 5: TỔNG HỢP -->
+<div class="panel" id="panel-5">
+  <p class="sec-title">Báo cáo hôm nay</p>
+  <div class="sgrid">
+    <div class="scard"><div class="snum2" style="color:var(--blue)" id="s-tot">0</div><div class="slbl">Tổng đơn</div></div>
+    <div class="scard"><div class="snum2" style="color:var(--amber)" id="s-del">0</div><div class="slbl">Đang giao</div></div>
+    <div class="scard"><div class="snum2" style="color:var(--green)" id="s-ok">0</div><div class="slbl">Hoàn thành</div></div>
+    <div class="scard"><div class="snum2" style="color:var(--red)" id="s-fail">0</div><div class="slbl">Thất bại</div></div>
+  </div>
+  <div class="row2">
+    <div class="col"><div class="scard" style="text-align:left;padding:12px"><div class="slbl">TM KT đã thu</div><div style="font-size:17px;font-weight:800;color:var(--green);margin-top:5px" id="s-cash">0 ₫</div></div></div>
+    <div class="col"><div class="scard" style="text-align:left;padding:12px"><div class="slbl">CK đã xác nhận</div><div style="font-size:17px;font-weight:800;color:var(--blue);margin-top:5px" id="s-ck">0 ₫</div></div></div>
+    <div class="col"><div class="scard" style="text-align:left;padding:12px"><div class="slbl">Đã TT trước</div><div style="font-size:17px;font-weight:800;color:var(--gray);margin-top:5px" id="s-paid">0 đơn</div></div></div>
+  </div>
+  <div class="divider"></div>
+  <p class="sec-title">Lịch sử đơn</p>
+  <div id="done-list"></div>
+  <div class="empty" id="done-empty">Chưa có đơn hoàn thành.</div>
+  <div style="margin-top:12px"><button class="btn btn-sm" onclick="exportExcel()">📊 Xuất Excel</button></div>
+</div>
+</div><!-- /app -->
+
+<!-- BOTTOM NAV (mobile) -->
+<div class="bnav" id="bnav" style="display:none">
+  <div class="bnav-inner" id="bnav-inner"></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// ⚙️ PASTE URL APPS SCRIPT CỦA BẠN VÀO ĐÂY
+// ════════════════════════════════════════════
+var API_URL = 'https://script.google.com/macros/s/AKfycbyqwnQBx5-IwNwpdhBajFvqmgN66tMCh1PgZRzHlQEaoJHFnA1Zq1XDM0MJ3euRXz4qfQ/exec';
+
+// ════════════════════════════════════════════
+// PHÂN QUYỀN
+// ════════════════════════════════════════════
+var ROLES = {
+  kho: {
+    name: 'Nhân viên kho', icon: '🏭',
+    tabs: [
+      {id:0, icon:'📊', label:'Dashboard'},
+      {id:1, icon:'📋', label:'Nhập đơn'},
+      {id:2, icon:'🚚', label:'Phân công'},
+      {id:5, icon:'📈', label:'Tổng hợp'}
+    ]
+  },
+  shipper: {
+    name: 'Tài xế', icon: '🚚',
+    tabs: [
+      {id:3, icon:'✅', label:'Giao hàng'}
+    ]
+  },
+  kt: {
+    name: 'Kế toán', icon: '💼',
+    tabs: [
+      {id:0, icon:'📊', label:'Dashboard'},
+      {id:4, icon:'💵', label:'Bàn giao KT'},
+      {id:5, icon:'📈', label:'Tổng hợp'}
+    ]
+  }
+};
+var currentRole = null, currentStep = 0;
+
+function setRole(role) {
+  currentRole = role;
+  var r = ROLES[role];
+  qs('role-screen').classList.remove('show');
+  qs('main-app').style.display = 'block';
+  qs('bnav').style.display = 'block';
+  qs('role-badge').style.display = 'block';
+  qs('role-name-badge').textContent = r.icon + ' ' + r.name;
+
+  // Build stepper & bottom nav
+  var st = qs('stepper'), bn = qs('bnav-inner');
+  st.innerHTML = ''; bn.innerHTML = '';
+  r.tabs.forEach(function(t, i) {
+    var d = document.createElement('div');
+    d.className = 'stab' + (i === 0 ? ' active' : '');
+    d.id = 'stab-' + i;
+    d.innerHTML = '<span class="snum">' + t.label + '</span>B' + (t.id);
+    d.onclick = (function(idx){return function(){goStep(idx);};})(i);
+    st.appendChild(d);
+    var b = document.createElement('button');
+    b.className = 'bnav-tab' + (i === 0 ? ' active' : '');
+    b.id = 'bnav-' + i;
+    b.innerHTML = '<span class="bicon">' + t.icon + '</span>' + t.label;
+    b.onclick = (function(idx){return function(){goStep(idx);};})(i);
+    bn.appendChild(b);
+  });
+  goStep(0);
+  if (hasAPI()) setTimeout(syncAll, 700);
+}
+
+function goStep(idx) {
+  currentStep = idx;
+  var tabs = ROLES[currentRole].tabs;
+  var panelId = tabs[idx].id;
+  // Stepper
+  document.querySelectorAll('.stab').forEach(function(t, i) {
+    t.classList.remove('active','done');
+    if (i < idx) t.classList.add('done');
+    if (i === idx) t.classList.add('active');
+  });
+  // Panels
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  var panel = qs('panel-' + panelId);
+  if (panel) panel.classList.add('active');
+  // Bnav
+  document.querySelectorAll('.bnav-tab').forEach(function(t, i) {
+    t.classList.toggle('active', i === idx);
+  });
+  window.scrollTo(0, 0);
+  renderAll();
+}
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+var orders = [], drivers = [], selected = [], previewRows = [];
+var cwOpen = {3:true, 4:true};
+var filterDriver = null, editingDriverId = null;
+
+// Tài xế mặc định
+drivers = [
+  {id:'d1',name:'Lưu Hoàng Khải',phone:'0901111111',shift:'Ca sáng (7h–12h)',active:true},
+  {id:'d2',name:'Nguyễn Văn Sang',phone:'0902222222',shift:'Ca chiều (12h–18h)',active:true},
+  {id:'d3',name:'Trần Minh Tuấn',phone:'0903333333',shift:'Ca sáng (7h–12h)',active:true},
+  {id:'d4',name:'Phạm Anh Dũng',phone:'0904444444',shift:'Ca tối (18h–22h)',active:true},
+];
+
+// ════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════
+function fmt(n){return Number(n||0).toLocaleString('vi-VN')+' ₫';}
+function pct(a,b){return b===0?'0%':Math.round(a/b*100)+'%';}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+function qs(id){return document.getElementById(id);}
+function val(id){var e=qs(id);return e?e.value:'';}
+
+(function(){
+  var d=new Date(),days=['Chủ nhật','Thứ hai','Thứ ba','Thứ tư','Thứ năm','Thứ sáu','Thứ bảy'];
+  qs('top-date').textContent=days[d.getDay()]+', '+d.toLocaleDateString('vi-VN');
+})();
+
+function showLoad(m){qs('loading').classList.add('show');if(m)qs('loading-msg').textContent=m;}
+function hideLoad(){qs('loading').classList.remove('show');}
+
+// ════════════════════════════════════════════
+// FLOATING ALERT
+// ════════════════════════════════════════════
+function showAlrt(msg, t) {
+  var old = document.querySelector('.alrt-float'); if(old) old.remove();
+  var div = document.createElement('div');
+  div.className = 'alrt alrt-' + (t==='ok'?'ok':t==='err'?'err':'info') + ' alrt-float';
+  div.style.cssText = 'position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:400;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.15);min-width:180px;text-align:center;font-weight:600';
+  div.textContent = msg;
+  document.body.appendChild(div);
+  setTimeout(function(){div.remove();}, 3500);
+}
+
+// ════════════════════════════════════════════
+// API
+// ════════════════════════════════════════════
+function hasAPI(){return !API_URL.includes('AKfycbyqwnQBx5-IwNwpdhBajFvqmgN66tMCh1PgZRzHlQEaoJHFnA1Zq1XDM0MJ3euRXz4qfQ');}
+function apiGet(p){
+  if(!hasAPI()) return Promise.resolve(null);
+  var url = API_URL+'?'+Object.keys(p).map(function(k){return k+'='+encodeURIComponent(p[k]);}).join('&');
+  return fetch(url).then(function(r){return r.json();}).catch(function(){return null;});
+}
+function apiPost(b){
+  if(!hasAPI()) return Promise.resolve(null);
+  return fetch(API_URL,{method:'POST',body:JSON.stringify(b)}).then(function(r){return r.json();}).catch(function(){return null;});
+}
+
+async function syncAll(){
+  if(!hasAPI()){showAlrt('Chưa cấu hình API — đang chạy offline','info');return;}
+  var btn=qs('sync-btn'); if(btn)btn.classList.add('spinning');
+  showLoad('Đang đồng bộ Sheets...');
+  try {
+    var r = await Promise.all([apiGet({action:'getOrders'}), apiGet({action:'getDrivers'})]);
+    if(r[0]&&r[0].ok) orders = r[0].data.map(normOrder);
+    if(r[1]&&r[1].ok&&r[1].data.length) drivers = r[1].data;
+    renderAll(); showAlrt('✓ Đồng bộ thành công','ok');
+  } catch(e){showAlrt('Lỗi: '+e.message,'err');}
+  finally{if(btn)btn.classList.remove('spinning'); hideLoad();}
+}
+
+function normOrder(o){
+  return {
+    id:String(o.id||''), name:o.ten||o.name||'', phone:o.sdt||o.phone||'',
+    addr:o.diachi||o.addr||'', zone:o.khuvuc||o.zone||'',
+    amount:Number(o.sotien||o.amount||0),
+    codStatus:o.codStatus==='paid'?'paid':'cod',
+    status:o.status||'pending', shipper:o.shipper||null, shift:o.shift||null,
+    payment:o.payment||null, cashAmt:Number(o.cashAmt||0),
+    imgOK:o.imgOK==='TRUE'||o.imgOK===true,
+    ktDone:o.ktDone==='TRUE'||o.ktDone===true,
+    failReason:o.failReason||null, doneAt:o.doneAt||null
+  };
+}
+
+// ════════════════════════════════════════════
+// TEMPLATE
+// ════════════════════════════════════════════
+function downloadTemplate(){
+  if(typeof XLSX==='undefined'){alert('Thư viện đang tải, thử lại.');return;}
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet([
+    ['Số HĐ Người nhận','Tên người nhận','SĐT','Địa chỉ giao hàng','Khu vực','Số tiền cần thu (VNĐ)','Trạng thái'],
+    ['2604250033','Nguyễn Anh Tú','0779157163','64/25 Ấp 3, Hóc Môn','Bình Chánh',2670000,'Cần thu COD'],
+    ['2604140453','Trần Thị Táo','0916111878','95T1 đường 20, Quận 9','Quận 9',1850000,'Cần thu COD'],
+    ['2604080033','Lê Hải Minh','0983511136','7/1A đường 14, Thủ Đức','Thủ Đức',0,'Đã thanh toán'],
+  ]);
+  ws['!cols']=[{wch:22},{wch:22},{wch:14},{wch:34},{wch:14},{wch:22},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,ws,'DS Don Hang');
+  XLSX.writeFile(wb,'mau_don_hang.xlsx');
+}
+
+// ════════════════════════════════════════════
+// EXCEL IMPORT
+// ════════════════════════════════════════════
+var CM={id:['số hđ','so hd','mã đơn','order id','id'],name:['tên người nhận','tên','ten','họ tên'],phone:['sđt','sdt','điện thoại','phone'],addr:['địa chỉ giao','dia chi','address','địa chỉ'],zone:['khu vực','khu vuc','zone'],amount:['số tiền cần thu','so tien','tiền','amount','cod'],status:['trạng thái','trang thai','status']};
+function fCol(hs,t){for(var i=0;i<hs.length;i++){var h=hs[i].toLowerCase().trim();if(CM[t].some(function(k){return h.includes(k);}))return hs[i];}return null;}
+function normSt(v){var vl=String(v).toLowerCase();return(vl.includes('đã')&&(vl.includes('tt')||vl.includes('thanh')))||vl.includes('paid')?'paid':'cod';}
+function onDrag(e,ov){e.preventDefault();qs('xl-drop').classList.toggle('drag',ov);}
+function onDrop(e){e.preventDefault();qs('xl-drop').classList.remove('drag');var f=e.dataTransfer.files[0];if(f)readFile(f);}
+function onFileChange(e){var f=e.target.files[0];if(f)readFile(f);}
+function readFile(file){
+  showLoad('Đang đọc file...');
+  var rdr=new FileReader();
+  rdr.onload=function(e){
+    hideLoad();
+    try{var wb=XLSX.read(e.target.result,{type:'array'});var ws=wb.Sheets[wb.SheetNames[0]];parseImport(XLSX.utils.sheet_to_json(ws,{defval:''}));}
+    catch(er){alert('Không đọc được file. Kiểm tra định dạng .xlsx');}
+  };
+  rdr.readAsArrayBuffer(file);
+}
+function parseImport(raw){
+  if(!raw.length){alert('File không có dữ liệu.');return;}
+  var hs=Object.keys(raw[0]);
+  var c={id:fCol(hs,'id'),name:fCol(hs,'name'),phone:fCol(hs,'phone'),addr:fCol(hs,'addr'),zone:fCol(hs,'zone'),amount:fCol(hs,'amount'),status:fCol(hs,'status')};
+  previewRows=raw.map(function(r,i){return{id:String(r[c.id]||'').trim()||('DH'+(i+1)),name:String(r[c.name]||'').trim(),phone:String(r[c.phone]||'').trim(),addr:String(r[c.addr]||'').trim(),zone:String(r[c.zone]||'').trim(),amount:parseFloat(String(r[c.amount]||'0').replace(/[^0-9.]/g,''))||0,codStatus:c.status?normSt(r[c.status]):'cod'};}).filter(function(r){return r.name||r.id;});
+  if(!previewRows.length){alert('Không tìm thấy dữ liệu hợp lệ.');return;}
+  qs('preview-section').style.display='block';
+  qs('preview-count').textContent=previewRows.length;
+  qs('btn-count').textContent=previewRows.length;
+  qs('preview-tbl').innerHTML='<thead><tr><th>#</th><th>Mã đơn</th><th>Tên</th><th>SĐT</th><th>Địa chỉ</th><th>KV</th><th>Tiền</th><th>TT</th></tr></thead><tbody>'+previewRows.map(function(r,i){return'<tr><td>'+(i+1)+'</td><td style="font-weight:700">'+r.id+'</td><td>'+r.name+'</td><td>'+r.phone+'</td><td>'+r.addr+'</td><td>'+r.zone+'</td><td style="text-align:right;font-weight:700">'+Number(r.amount).toLocaleString('vi-VN')+'</td><td><span class="'+(r.codStatus==='paid'?'bpaid':'bcod')+'">'+(r.codStatus==='paid'?'Đã TT':'COD')+'</span></td></tr>';}).join('')+'</tbody>';
+}
+function clearImport(){previewRows=[];qs('preview-section').style.display='none';qs('xl-file').value='';}
+async function importOrders(){
+  var ex=new Set(orders.map(function(o){return String(o.id);}));
+  var add=previewRows.filter(function(r){return!ex.has(String(r.id));}).map(function(r){return Object.assign({},r,{status:'pending',shipper:null,shift:null,payment:null,cashAmt:0,imgOK:false,ktDone:false,failReason:null,doneAt:null});});
+  orders=orders.concat(add);clearImport();renderAll();
+  if(add.length){
+    showAlrt('✓ Đã nhập '+add.length+' đơn','ok');
+    await apiPost({action:'addOrders',orders:add.map(function(o){return{id:o.id,ten:o.name,sdt:o.phone,diachi:o.addr,khuvuc:o.zone,sotien:o.amount,codStatus:o.codStatus,status:'pending',ktDone:false,imgOK:false};}),user:currentRole});
+  }
+}
+
+// ════════════════════════════════════════════
+// MANUAL ADD
+// ════════════════════════════════════════════
+async function addManual(){
+  var name=val('m-name').trim();if(!name){alert('Nhập tên người nhận!');return;}
+  var id=val('m-id').trim()||uid();
+  if(orders.find(function(o){return o.id===id;})){alert('Mã đơn đã tồn tại!');return;}
+  var o={id:id,name:name,phone:val('m-phone').trim(),addr:val('m-addr').trim(),zone:val('m-zone'),amount:parseFloat(val('m-amt'))||0,codStatus:val('m-status'),status:'pending',shipper:null,shift:null,payment:null,cashAmt:0,imgOK:false,ktDone:false,failReason:null,doneAt:null};
+  orders.push(o);['m-id','m-name','m-phone','m-addr','m-amt'].forEach(function(x){var e=qs(x);if(e)e.value='';});
+  renderAll();showAlrt('✓ Đã thêm đơn #'+id,'ok');
+  await apiPost({action:'addOrder',order:{id:o.id,ten:o.name,sdt:o.phone,diachi:o.addr,khuvuc:o.zone,sotien:o.amount,codStatus:o.codStatus,status:'pending',ktDone:false,imgOK:false},user:currentRole});
+}
+
+// ════════════════════════════════════════════
+// DRIVERS
+// ════════════════════════════════════════════
+function openDriverModal(id){
+  editingDriverId=id||null;
+  if(id){var d=drivers.find(function(x){return x.id===id;});qs('drv-modal-title').textContent='Sửa tài xế';qs('di-name').value=d.name;qs('di-phone').value=d.phone||'';qs('di-shift').value=d.shift;}
+  else{qs('drv-modal-title').textContent='Thêm tài xế';qs('di-name').value='';qs('di-phone').value='';qs('di-shift').value='Ca sáng (7h–12h)';}
+  qs('drv-modal').classList.add('open');setTimeout(function(){qs('di-name').focus();},100);
+}
+async function saveDriver(){
+  var name=val('di-name').trim();if(!name){alert('Nhập họ tên!');return;}
+  if(editingDriverId){
+    var d=drivers.find(function(x){return x.id===editingDriverId;});d.name=name;d.phone=val('di-phone').trim();d.shift=val('di-shift');
+    await apiPost({action:'updateDriver',id:editingDriverId,updates:{ten:name,sdt:d.phone,shift:d.shift}});
+  }else{
+    var nd={id:'d'+Date.now(),name:name,phone:val('di-phone').trim(),shift:val('di-shift'),active:true};drivers.push(nd);
+    await apiPost({action:'addDriver',driver:{id:nd.id,ten:nd.name,sdt:nd.phone,shift:nd.shift,active:true}});
+  }
+  closeModal('drv-modal');renderAll();
+}
+async function deleteDriver(id){
+  var d=drivers.find(function(x){return x.id===id;});
+  if(orders.some(function(o){return o.shipper===d.name&&o.status==='delivering';})){alert('Tài xế đang có đơn giao!');return;}
+  if(!confirm('Xoá tài xế '+d.name+'?'))return;
+  drivers=drivers.filter(function(x){return x.id!==id;});
+  await apiPost({action:'deleteDriver',id:id});renderAll();
+}
+function setFilterDriver(name){filterDriver=filterDriver===name?null:name;renderLists();renderDriverGrid();}
+
+// ════════════════════════════════════════════
+// SELECTION
+// ════════════════════════════════════════════
+function toggleSel(id){var i=selected.indexOf(id);if(i>=0)selected.splice(i,1);else selected.push(id);renderLists();}
+function clearSel(){selected=[];filterDriver=null;renderLists();renderDriverGrid();}
+function selectAllPending(){
+  var q=val('p2-search').toLowerCase(),z=val('p2-zone');
+  selected=orders.filter(function(o){return o.status==='pending'&&(!q||o.id.toLowerCase().includes(q)||o.name.toLowerCase().includes(q))&&(!z||o.zone===z);}).map(function(o){return o.id;});
+  renderLists();
+}
+
+// ════════════════════════════════════════════
+// ASSIGN
+// ════════════════════════════════════════════
+async function confirmAssign(){
+  var sh=val('shipper-sel'),sf=val('shift-sel');if(!sh){alert('Chọn tài xế!');return;}
+  showLoad('Đang phân công...');
+  selected.forEach(function(id){var o=orders.find(function(x){return x.id===id;});if(o){o.status='delivering';o.shipper=sh;o.shift=sf;}});
+  var ids=selected.slice();selected=[];filterDriver=null;renderAll();hideLoad();
+  showAlrt('✓ Phân '+ids.length+' đơn cho '+sh,'ok');
+  await apiPost({action:'assignOrders',ids:ids,shipper:sh,shift:sf,user:currentRole});
+}
+
+// ════════════════════════════════════════════
+// CONFIRM DELIVERY
+// ════════════════════════════════════════════
+function openConfirm(id){
+  var o=orders.find(function(x){return x.id===id;});if(!o)return;
+  var ip=o.codStatus==='paid';
+  qs('cm-title').textContent='#'+o.id+' — '+o.name;
+  qs('cm-body').innerHTML=
+    '<div class="ibox"><strong>'+o.name+'</strong>'+(o.phone?' · '+o.phone:'')+'<br>'+(o.addr?'📍 '+o.addr+'<br>':'')+'<strong>'+fmt(o.amount)+'</strong> <span class="'+(ip?'bpaid':'bcod')+'">'+(ip?'Đã TT':'COD')+'</span></div>'+
+    '<button class="btn btn-s btn-full" onclick="showPay(\''+id+'\')">✓ Giao thành công</button>'+
+    '<button class="btn btn-d btn-full" onclick="showFail(\''+id+'\')">✗ Giao thất bại</button>'+
+    '<div id="sub-'+id+'"></div>';
+  qs('confirm-modal').classList.add('open');
+}
+
+function showPay(id){
+  var o=orders.find(function(x){return x.id===id;});
+  if(o.codStatus==='paid'){
+    qs('sub-'+id).innerHTML='<div class="divider"></div><div class="alrt alrt-info">✅ Đơn đã TT trước — không cần thu tiền.</div><button class="btn btn-s btn-full" onclick="donePaid(\''+id+'\')">✓ Hoàn thành</button>';
+    return;
+  }
+  qs('sub-'+id).innerHTML=
+    '<div class="divider"></div><p style="font-size:13px;font-weight:700;margin-bottom:12px">Khách thanh toán bằng:</p>'+
+    '<div class="pay-grid">'+
+      '<div class="pay-opt" id="pc-'+id+'" onclick="selP(\''+id+'\',\'cash\')"><div class="pay-icon">💵</div><div class="pay-label">Tiền mặt</div><div class="pay-sub">Thu trực tiếp</div></div>'+
+      '<div class="pay-opt" id="pk-'+id+'" onclick="selP(\''+id+'\',\'ck\')"><div class="pay-icon">🏦</div><div class="pay-label">Chuyển khoản</div><div class="pay-sub">Banking / UNC</div></div>'+
+    '</div><div id="pd-'+id+'"></div>';
+}
+
+function selP(id,t){
+  var o=orders.find(function(x){return x.id===id;});o.payment=t;
+  qs('pc-'+id).className='pay-opt'+(t==='cash'?' sel-cash':'');
+  qs('pk-'+id).className='pay-opt'+(t==='ck'?' sel-ck':'');
+  var det=qs('pd-'+id);
+  if(t==='cash'){
+    det.innerHTML=
+      '<label>Số tiền thực thu (₫)</label>'+
+      '<input type="number" id="ca-'+id+'" value="'+o.amount+'" style="margin-bottom:12px">'+
+      '<div class="alrt alrt-info" style="font-size:11px;margin-bottom:12px">💡 Shipper giữ tiền mặt → bàn giao KT ở Bước 4</div>'+
+      '<button class="btn btn-s btn-full" onclick="doCash(\''+id+'\')">✓ Xác nhận tiền mặt</button>';
+  } else {
+    det.innerHTML=
+      '<label style="margin-bottom:8px">📷 Ảnh biên lai chuyển khoản *</label>'+
+      '<div class="img-upload-area" id="up-'+id+'">'+
+        '<input type="file" accept="image/*" capture="environment" onchange="onImgChange(event,\''+id+'\')">'+
+        '<div id="up-icon-'+id+'" style="font-size:36px;margin-bottom:8px">📷</div>'+
+        '<p id="up-txt-'+id+'" style="font-size:13px;color:var(--muted);font-weight:600">Chụp hoặc chọn ảnh biên lai</p>'+
+        '<p style="font-size:11px;color:var(--hint);margin-top:4px">Hỗ trợ JPG, PNG</p>'+
+        '<img id="up-prev-'+id+'" class="img-preview">'+
+      '</div>'+
+      '<div class="alrt alrt-info" style="font-size:11px;margin-bottom:12px">💡 Kế toán xác nhận nhận CK ở Bước 4</div>'+
+      '<button class="btn btn-p btn-full" onclick="doCK(\''+id+'\')">✓ Xác nhận chuyển khoản</button>';
+  }
+}
+
+function onImgChange(e, id){
+  var file=e.target.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var prev=qs('up-prev-'+id);
+    prev.src=ev.target.result; prev.classList.add('show');
+    qs('up-icon-'+id).textContent='✅';
+    qs('up-txt-'+id).textContent='Ảnh đã tải lên thành công!';
+    qs('up-'+id).classList.add('has-img');
+    orders.find(function(x){return x.id===id;}).imgOK=true;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function donePaid(id){
+  var o=orders.find(function(x){return x.id===id;});
+  o.status='done';o.payment='paid';o.ktDone=true;o.doneAt=new Date().toLocaleTimeString('vi-VN');
+  closeModal('confirm-modal');renderAll();showAlrt('✓ Hoàn thành','ok');
+  await apiPost({action:'completeOrder',id:id,result:'done',payment:'paid',user:currentRole});
+}
+async function doCash(id){
+  var o=orders.find(function(x){return x.id===id;});
+  o.cashAmt=parseFloat(val('ca-'+id))||o.amount;
+  o.status='done';o.doneAt=new Date().toLocaleTimeString('vi-VN');
+  closeModal('confirm-modal');renderAll();showAlrt('✓ Giao thành công — TM','ok');
+  await apiPost({action:'completeOrder',id:id,result:'done',payment:'cash',cashAmt:o.cashAmt,user:currentRole});
+}
+async function doCK(id){
+  var o=orders.find(function(x){return x.id===id;});
+  if(!o.imgOK){alert('Vui lòng chụp / chọn ảnh biên lai trước!');return;}
+  o.status='done';o.doneAt=new Date().toLocaleTimeString('vi-VN');
+  closeModal('confirm-modal');renderAll();showAlrt('✓ Giao thành công — CK','ok');
+  await apiPost({action:'completeOrder',id:id,result:'done',payment:'ck',imgOK:true,user:currentRole});
+}
+function showFail(id){
+  qs('sub-'+id).innerHTML=
+    '<div class="divider"></div>'+
+    '<label>Lý do thất bại</label>'+
+    '<select id="fr-'+id+'" style="margin-bottom:12px">'+
+      '<option>Khách không nghe máy</option><option>Khách từ chối nhận</option>'+
+      '<option>Sai địa chỉ</option><option>Khách hẹn lại</option><option>Khác</option>'+
+    '</select>'+
+    '<button class="btn btn-d btn-full" onclick="doFail(\''+id+'\')">✗ Xác nhận thất bại</button>';
+}
+async function doFail(id){
+  var o=orders.find(function(x){return x.id===id;});
+  o.status='fail';o.failReason=val('fr-'+id);o.doneAt=new Date().toLocaleTimeString('vi-VN');
+  closeModal('confirm-modal');renderAll();showAlrt('Đã ghi nhận thất bại','info');
+  await apiPost({action:'completeOrder',id:id,result:'fail',failReason:o.failReason,user:currentRole});
+}
+
+// ════════════════════════════════════════════
+// KT
+// ════════════════════════════════════════════
+async function ktCash(sh){
+  var targets=orders.filter(function(o){return o.status==='done'&&o.payment==='cash'&&o.shipper===sh&&!o.ktDone;});
+  var ids=targets.map(function(o){return o.id;});
+  targets.forEach(function(o){o.ktDone=true;});
+  renderAll();showAlrt('✓ Đã thu tiền mặt từ '+sh,'ok');
+  await apiPost({action:'ktConfirm',ids:ids,type:'cash',user:currentRole});
+}
+async function ktCK(id){
+  var o=orders.find(function(x){return x.id===id;});if(o)o.ktDone=true;
+  renderAll();showAlrt('✓ Đã xác nhận CK','ok');
+  await apiPost({action:'ktConfirm',ids:[id],type:'ck',user:currentRole});
+}
+
+// ════════════════════════════════════════════
+// MODAL
+// ════════════════════════════════════════════
+function closeModal(id){qs(id).classList.remove('open');}
+document.addEventListener('click',function(e){['drv-modal','confirm-modal'].forEach(function(id){if(e.target===qs(id))closeModal(id);});});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal('drv-modal');closeModal('confirm-modal');}});
+
+// ════════════════════════════════════════════
+// CASH WIDGET
+// ════════════════════════════════════════════
+function toggleCW(n){cwOpen[n]=!cwOpen[n];qs('cw-'+n+'-body').style.display=cwOpen[n]?'':'none';qs('cw-'+n+'-tog').textContent=cwOpen[n]?'▾':'▸';}
+function renderCW(n){
+  var body=qs('cw-'+n+'-body'),tot=qs('cw-'+n+'-total');if(!body)return;
+  var shs=[...new Set(orders.filter(function(o){return o.shipper;}).map(function(o){return o.shipper;}))];
+  var items=shs.map(function(sh){
+    var h=orders.filter(function(o){return o.shipper===sh&&o.status==='done'&&o.payment==='cash'&&!o.ktDone;}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+    var c=orders.filter(function(o){return o.shipper===sh&&o.status==='done'&&o.payment==='cash'&&!o.ktDone;}).length;
+    return{sh:sh,h:h,c:c};
+  }).filter(function(x){return x.h>0;});
+  var grand=items.reduce(function(s,x){return s+x.h;},0);
+  tot.textContent=grand>0?'— '+fmt(grand):'';
+  body.innerHTML=items.length
+    ?items.map(function(x){return'<div class="cw-item"><div class="cw-sh">🚚 '+x.sh+'</div><div class="cw-amt">'+fmt(x.h)+'</div><div class="cw-cnt">'+x.c+' đơn chờ bàn giao</div></div>';}).join('')
+    :'<div class="cw-zero">Không có tài xế nào đang cầm tiền ✓</div>';
+  body.style.display=cwOpen[n]?'':'none';
+}
+
+// ════════════════════════════════════════════
+// EXPORT EXCEL
+// ════════════════════════════════════════════
+function exportExcel(){
+  if(typeof XLSX==='undefined'){alert('Thư viện chưa tải xong.');return;}
+  var wb=XLSX.utils.book_new();
+  var r1=[['Mã đơn','Tên','SĐT','Địa chỉ','Khu vực','Số tiền','Loại','Trạng thái','Tài xế','Ca','Thanh toán','Tiền TT','KT XN','Lý do','Giờ xong']];
+  orders.forEach(function(o){r1.push([o.id,o.name,o.phone,o.addr,o.zone,o.amount,o.codStatus==='paid'?'Đã TT':'COD',o.status,o.shipper||'',o.shift||'',o.payment||'',o.cashAmt||'',o.ktDone?'Có':'',o.failReason||'',o.doneAt||'']);});
+  var ws1=XLSX.utils.aoa_to_sheet(r1);ws1['!cols']=[{wch:14},{wch:20},{wch:12},{wch:28},{wch:12},{wch:13},{wch:10},{wch:11},{wch:18},{wch:15},{wch:12},{wch:12},{wch:8},{wch:16},{wch:15}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Tất cả đơn');
+  var r2=[['Tài xế','Tổng đơn','Xong','Thất bại','TM đang cầm','TM đã bàn giao','CK đã XN']];
+  [...new Set(orders.filter(function(o){return o.shipper;}).map(function(o){return o.shipper;}))].forEach(function(sh){
+    var mo=orders.filter(function(o){return o.shipper===sh;});
+    var hold=mo.filter(function(o){return o.status==='done'&&o.payment==='cash'&&!o.ktDone;}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+    var gave=mo.filter(function(o){return o.ktDone&&o.payment==='cash';}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+    var ck=mo.filter(function(o){return o.ktDone&&o.payment==='ck';}).reduce(function(s,o){return s+o.amount;},0);
+    r2.push([sh,mo.length,mo.filter(function(o){return o.status==='done';}).length,mo.filter(function(o){return o.status==='fail';}).length,hold,gave,ck]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r2),'Tổng hợp tài xế');
+  XLSX.writeFile(wb,'BaoCao_'+new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')+'.xlsx');
+}
+
+// ════════════════════════════════════════════
+// RESET DAY
+// ════════════════════════════════════════════
+async function confirmResetDay(){
+  if(!confirm('Reset ngày mới?\nGiữ lại đơn chưa giao. Xoá đơn đã xong/thất bại.'))return;
+  orders=orders.filter(function(o){return o.status==='pending'||o.status==='delivering';});
+  selected=[];filterDriver=null;renderAll();
+  showAlrt('✓ Reset xong. Còn '+orders.length+' đơn.','ok');
+  await apiPost({action:'resetDay',user:currentRole});
+}
+
+// ════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════
+function renderAll(){renderStats();renderDashboard();renderLists();renderDriverGrid();renderCW(3);renderCW(4);renderKT();renderSummary();}
+
+function renderStats(){
+  var p=orders.filter(function(o){return o.status==='pending';}).length,d=orders.filter(function(o){return o.status==='delivering';}).length,ok=orders.filter(function(o){return o.status==='done';}).length;
+  qs('sp-pend').textContent=p+' chờ';qs('sp-del').textContent=d+' giao';qs('sp-done').textContent=ok+' xong';
+}
+
+function renderDashboard(){
+  if(!qs('k-tot'))return;
+  var tot=orders.length,p=orders.filter(function(o){return o.status==='pending';}).length,d=orders.filter(function(o){return o.status==='delivering';}).length,ok=orders.filter(function(o){return o.status==='done';}).length,f=orders.filter(function(o){return o.status==='fail';}).length;
+  qs('k-tot').textContent=tot;qs('k-tot-s').textContent=[...new Set(orders.map(function(o){return o.zone;}).filter(Boolean))].length+' khu vực';
+  qs('k-del').textContent=d;qs('k-del-s').textContent=[...new Set(orders.filter(function(o){return o.status==='delivering';}).map(function(o){return o.shipper;}))].filter(Boolean).length+' tài xế';
+  qs('k-ok').textContent=ok;qs('k-ok-s').textContent=pct(ok,tot);
+  qs('k-fail').textContent=f;qs('k-fail-s').textContent=pct(f,tot);
+  var hold=orders.filter(function(o){return o.status==='done'&&o.payment==='cash'&&!o.ktDone;}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+  var hcnt=orders.filter(function(o){return o.status==='done'&&o.payment==='cash'&&!o.ktDone;}).length;
+  qs('d-hold').textContent=fmt(hold);qs('d-hold-s').textContent=hcnt+' đơn chưa bàn giao KT';
+  var cKT=orders.filter(function(o){return o.ktDone&&o.payment==='cash';}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+  var ckKT=orders.filter(function(o){return o.ktDone&&o.payment==='ck';}).reduce(function(s,o){return s+o.amount;},0);
+  qs('d-conf').textContent=fmt(cKT+ckKT);qs('d-ck-s').textContent='CK: '+fmt(ckKT);
+  // Driver table
+  var de=qs('d-driver');
+  var shs=[...new Set(orders.filter(function(o){return o.shipper;}).map(function(o){return o.shipper;}))];
+  if(!shs.length){de.innerHTML='<div class="empty">Chưa phân công tài xế nào.</div>';return;}
+  de.innerHTML='<table class="tbl"><thead><tr><th>Tài xế</th><th>Tiến độ</th><th>TM đang cầm</th></tr></thead><tbody>'+shs.map(function(sh){
+    var mo=orders.filter(function(o){return o.shipper===sh;});
+    var md=mo.filter(function(o){return o.status==='delivering';}).length,mok=mo.filter(function(o){return o.status==='done';}).length,mf=mo.filter(function(o){return o.status==='fail';}).length;
+    var mh=mo.filter(function(o){return o.status==='done'&&o.payment==='cash'&&!o.ktDone;}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+    var prog=Math.round((mok+mf)/mo.length*100)||0;
+    return'<tr><td><div style="font-weight:700;font-size:12px">🚚 '+sh+'</div><div style="font-size:10px;color:var(--muted)">'+(mo[0]&&mo[0].shift||'')+'</div></td>'+
+      '<td><div class="opills">'+(md?'<span class="op opd">'+md+' giao</span>':'')+(mok?'<span class="op opok">'+mok+' xong</span>':'')+(mf?'<span class="op opf">'+mf+' TB</span>':'')+'</div><div class="pbar"><div class="pfill '+(prog<50?'pfill-a':'')+'" style="width:'+prog+'%"></div></div><div style="font-size:10px;color:var(--hint);margin-top:2px">'+prog+'%</div></td>'+
+      '<td>'+(mh>0?'<div style="font-size:13px;font-weight:800;color:var(--amber)">'+fmt(mh)+'</div>':'<span style="font-size:11px;color:var(--hint)">—</span>')+'</td></tr>';
+  }).join('')+'</tbody></table>';
+  // Zone
+  var ze=qs('d-zone');
+  var zones=[...new Set(orders.map(function(o){return o.zone;}).filter(Boolean))];
+  if(!zones.length){ze.innerHTML='<div class="empty">Chưa có dữ liệu.</div>';return;}
+  ze.innerHTML='<table class="tbl"><thead><tr><th>Khu vực</th><th>Tổng</th><th>Xong/TB</th><th>COD</th><th>%</th></tr></thead><tbody>'+zones.map(function(z){
+    var zo=orders.filter(function(o){return o.zone===z;});
+    var zd=zo.filter(function(o){return o.status==='done';}).length,zf=zo.filter(function(o){return o.status==='fail';}).length,prog=Math.round((zd+zf)/zo.length*100)||0;
+    var za=zo.filter(function(o){return o.codStatus==='cod';}).reduce(function(s,o){return s+o.amount;},0);
+    return'<tr><td style="font-weight:700">📍 '+z+'</td><td>'+zo.length+'</td><td><span class="op opok">'+zd+'</span> <span class="op opf">'+zf+'</span></td><td style="font-weight:700;font-size:11px;color:var(--green)">'+fmt(za)+'</td><td><div class="pbar" style="min-width:50px"><div class="pfill" style="width:'+prog+'%"></div></div><div style="font-size:10px;color:var(--hint)">'+prog+'%</div></td></tr>';
+  }).join('')+'</tbody></table>';
+}
+
+function renderDriverGrid(){
+  var g=qs('drv-grid');if(!g)return;
+  g.innerHTML=drivers.map(function(d){
+    var mo=orders.filter(function(o){return o.shipper===d.name;});
+    var md=mo.filter(function(o){return o.status==='delivering';}).length,mok=mo.filter(function(o){return o.status==='done';}).length;
+    var mh=mo.filter(function(o){return o.status==='done'&&o.payment==='cash'&&!o.ktDone;}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+    var init=d.name.split(' ').map(function(w){return w[0];}).slice(-2).join('').toUpperCase();
+    var cls='drv-card'+(md>0?' drv-busy':mok>0?' drv-ok':'')+(filterDriver===d.name?' drv-sel':'');
+    return'<div class="'+cls+'" onclick="setFilterDriver(\''+d.name+'\')">'+
+      '<span class="drv-del" onclick="event.stopPropagation();deleteDriver(\''+d.id+'\')">✕</span>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div class="drv-avatar">'+init+'</div><div><div class="drv-name">'+d.name+'</div><div class="drv-shift">'+d.shift+'</div></div></div>'+
+      '<div class="opills">'+(md?'<span class="op opd">'+md+' giao</span>':'')+(mok?'<span class="op opok">'+mok+' xong</span>':'')+(mh?'<span style="font-size:10px;font-weight:700;color:var(--amber)">💵'+fmt(mh)+'</span>':'')+((!md&&!mok)?'<span style="font-size:10px;color:var(--hint)">Chưa có đơn</span>':'')+'</div>'+
+      '<button class="btn btn-sm" style="width:100%;margin-top:8px;font-size:10px;padding:6px" onclick="event.stopPropagation();openDriverModal(\''+d.id+'\')">✏️ Sửa</button>'+
+      '</div>';
+  }).join('')+'<div class="drv-add" onclick="openDriverModal()">＋ Thêm tài xế</div>';
+  var sel=qs('shipper-sel');if(sel){var cur=sel.value;sel.innerHTML='<option value="">-- Chọn tài xế --</option>'+drivers.map(function(d){return'<option value="'+d.name+'">'+d.name+'</option>';}).join('');if(cur)sel.value=cur;}
+}
+
+function renderLists(){
+  var stMap={pending:'bw',delivering:'bd',done:'bok',fail:'bf'};
+  var stTxt={pending:'Chờ phân',delivering:'Đang giao',done:'Hoàn thành',fail:'Thất bại'};
+  // P1
+  var l1=qs('list-1');if(l1){
+    var q1=(val('p1-search')||'').toLowerCase();
+    var p1=orders.filter(function(o){return!q1||o.id.toLowerCase().includes(q1)||o.name.toLowerCase().includes(q1);});
+    qs('p1-count').textContent=orders.length;
+    l1.innerHTML=p1.map(function(o){return'<div class="ocard nocur"><div class="ohead"><div><div class="oid">#'+o.id+' — '+o.name+(o.phone?' · '+o.phone:'')+'</div>'+(o.addr?'<div class="oaddr">📍 '+o.addr+(o.zone?' · '+o.zone:'')+'</div>':'')+'</div><div style="text-align:right;flex-shrink:0"><span class="badge '+(stMap[o.status]||'bw')+'">'+(stTxt[o.status]||'')+'</span><div class="oamt '+(o.codStatus==='paid'?'amt-gray':'amt-g')+'">'+(o.codStatus==='paid'?'Đã TT':fmt(o.amount))+'</div></div></div></div>';}).join('');
+    qs('empty-1').style.display=p1.length?'none':'block';
+  }
+  // P2
+  var l2=qs('list-2');if(l2){
+    var q2=(val('p2-search')||'').toLowerCase(),z2=val('p2-zone');
+    var p2=orders.filter(function(o){return o.status==='pending'&&(!q2||o.id.toLowerCase().includes(q2)||o.name.toLowerCase().includes(q2))&&(!z2||o.zone===z2);});
+    qs('p2-sec-title').textContent=filterDriver?'Đơn chờ — '+filterDriver:'Đơn chờ phân công';
+    l2.innerHTML=p2.map(function(o){var s=selected.includes(o.id);return'<div class="ocard'+(s?' sel':'')+'" onclick="toggleSel(\''+o.id+'\')"><div class="ohead"><div><div class="oid">'+(s?'☑':'☐')+' #'+o.id+' — '+o.name+'</div><div class="oaddr">📍 '+(o.addr||'')+(o.zone?' · '+o.zone:'')+'</div></div><div style="text-align:right;flex-shrink:0"><div class="oamt '+(o.codStatus==='paid'?'amt-gray':'amt-g')+'">'+(o.codStatus==='paid'?'Đã TT':fmt(o.amount))+'</div><span class="'+(o.codStatus==='paid'?'bpaid':'bcod')+'">'+(o.codStatus==='paid'?'Đã TT':'COD')+'</span></div></div></div>';}).join('');
+    qs('empty-2').style.display=p2.length?'none':'block';
+    qs('assign-form').style.display=selected.length?'block':'none';
+    var sc=qs('sel-count');if(sc)sc.textContent=selected.length;
+    if(filterDriver){var ss=qs('shipper-sel');if(ss)ss.value=filterDriver;}
+  }
+  // P3
+  var l3=qs('list-3');if(l3){
+    var p3=orders.filter(function(o){return o.status==='delivering';});
+    l3.innerHTML=p3.map(function(o){return'<div class="ocard bl-b" onclick="openConfirm(\''+o.id+'\')"><div class="ohead"><div><div class="oid">#'+o.id+' — '+o.name+(o.phone?' · '+o.phone:'')+'</div>'+(o.addr?'<div class="oaddr">📍 '+o.addr+'</div>':'')+'<div class="stag">🚚 '+o.shipper+' · '+o.shift+'</div></div><div style="text-align:right;flex-shrink:0"><span class="badge bd">Đang giao</span><div class="oamt '+(o.codStatus==='paid'?'amt-gray':'amt-g')+'" style="margin-top:6px">'+(o.codStatus==='paid'?'Đã TT':fmt(o.amount))+'</div></div></div></div>';}).join('');
+    qs('empty-3').style.display=p3.length?'none':'block';
+  }
+}
+
+function renderKT(){
+  var kc=qs('kt-cash');if(!kc)return;
+  var cO=orders.filter(function(o){return o.status==='done'&&o.payment==='cash'&&!o.ktDone;});
+  var ckO=orders.filter(function(o){return o.status==='done'&&o.payment==='ck'&&!o.ktDone;});
+  var grp={};cO.forEach(function(o){if(!grp[o.shipper])grp[o.shipper]={t:0,c:0};grp[o.shipper].t+=(o.cashAmt||o.amount);grp[o.shipper].c++;});
+  kc.innerHTML=Object.entries(grp).map(function(e){var sh=e[0],d=e[1];return'<div class="hi"><div><div class="hi-name">🚚 '+sh+'</div><div class="hi-sub">'+d.c+' đơn tiền mặt cần bàn giao</div></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><div class="hi-amt">'+fmt(d.t)+'</div><button class="btn btn-s btn-sm" onclick="ktCash(\''+sh+'\')">Thu ✓</button></div></div>';}).join('');
+  qs('kt-cash-e').style.display=Object.keys(grp).length?'none':'block';
+  qs('kt-ck').innerHTML=ckO.map(function(o){return'<div class="hi"><div><div class="hi-name">#'+o.id+' — '+o.name+'</div><div class="hi-sub">🏦 CK · '+o.shipper+'</div></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><div class="hi-amt hi-ck">'+fmt(o.amount)+'</div><button class="btn btn-p btn-sm" onclick="ktCK(\''+o.id+'\')">XN ✓</button></div></div>';}).join('');
+  qs('kt-ck-e').style.display=ckO.length?'none':'block';
+  qs('kt-all-e').style.display=(!Object.keys(grp).length&&!ckO.length)?'block':'none';
+}
+
+function renderSummary(){
+  if(!qs('s-tot'))return;
+  var tot=orders.length,d=orders.filter(function(o){return o.status==='delivering';}).length,ok=orders.filter(function(o){return o.status==='done';}).length,f=orders.filter(function(o){return o.status==='fail';}).length;
+  qs('s-tot').textContent=tot;qs('s-del').textContent=d;qs('s-ok').textContent=ok;qs('s-fail').textContent=f;
+  var sc=orders.filter(function(o){return o.ktDone&&o.payment==='cash';}).reduce(function(s,o){return s+(o.cashAmt||o.amount);},0);
+  var sk=orders.filter(function(o){return o.ktDone&&o.payment==='ck';}).reduce(function(s,o){return s+o.amount;},0);
+  qs('s-cash').textContent=fmt(sc);qs('s-ck').textContent=fmt(sk);qs('s-paid').textContent=orders.filter(function(o){return o.codStatus==='paid';}).length+' đơn';
+  var dl=orders.filter(function(o){return o.status==='done'||o.status==='fail';});
+  qs('done-list').innerHTML=dl.map(function(o){return'<div class="ocard '+(o.status==='done'?'bl-g':'bl-r')+' nocur"><div class="ohead"><div><div class="oid">#'+o.id+' — '+o.name+'</div><div class="stag">🚚 '+o.shipper+' · '+(o.doneAt||'')+'</div>'+(o.status==='fail'?'<div style="font-size:10px;color:var(--red);margin-top:2px">'+o.failReason+'</div>':'')+'</div><div style="text-align:right;flex-shrink:0"><span class="badge '+(o.status==='done'?'bok':'bf')+'">'+(o.status==='done'?'Hoàn thành':'Thất bại')+'</span>'+(o.status==='done'?'<div style="font-size:10px;color:var(--muted);margin-top:5px">'+(o.payment==='cash'?'💵 TM':o.payment==='ck'?'🏦 CK':'✅ Đã TT')+'<br>'+(o.ktDone?'✅ KT xác nhận':'⏳ Chờ KT')+'</div>':'')+'</div></div></div>';}).join('');
+  qs('done-empty').style.display=dl.length?'none':'block';
+}
+</script>
+</body>
+</html>
